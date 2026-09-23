@@ -481,6 +481,8 @@
     let speedValue = 10;
     let stepAccumulator = 0;
     let animationFrameId = null;
+    let trailFrameCount = 0;
+    const TRAIL_DECAY_INTERVAL = 3; // 숫자가 클수록 흔적이 더 천천히 사라짐 (예: 3세대에 1단계 감소)
 
     // Viewport State (Zoom & Pan)
     let scale = 1.0;
@@ -622,12 +624,34 @@
           let nextState = isAlive ? (survivalRules.has(neighbors) ? 1 : 0) : (birthRules.has(neighbors) ? 1 : 0);
           nextGrid[r][c] = nextState;
 
-          if (nextState === 1) {
-            currentPop++;
-            historyGrid[r][c] = TRAIL_MAX;
-          } else if (historyGrid[r][c] > 0) {
-            historyGrid[r][c]--; // 천천히 감퇴
+          // step() 함수 최상단 또는 시작 부분에 프레임 카운터 증가 및 감퇴 여부 체크
+          const shouldDecayTrail = (trailFrameCount % TRAIL_DECAY_INTERVAL === 0);
+          
+          for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+              const neighbors = countNeighbors(r, c);
+              const isAlive = grid[r][c] === 1;
+          
+              let nextState = isAlive ? (survivalRules.has(neighbors) ? 1 : 0) : (birthRules.has(neighbors) ? 1 : 0);
+              nextGrid[r][c] = nextState;
+          
+              if (nextState === 1) {
+                currentPop++;
+                historyGrid[r][c] = TRAIL_MAX;
+              } else if (historyGrid[r][c] > 0) {
+                // 지정한 프레임 간격(TRAIL_DECAY_INTERVAL)일 때만 1단계 감소
+                if (shouldDecayTrail) {
+                  historyGrid[r][c]--;
+                }
+              }
+          
+              if (!isAlive && nextState === 1) bornThisStep++;
+              if (isAlive && nextState === 0) diedThisStep++;
+            }
           }
+
+          // step() 함수 맨 끝에서 카운터 증가
+          trailFrameCount++;
 
           if (!isAlive && nextState === 1) bornThisStep++;
           if (isAlive && nextState === 0) diedThisStep++;
