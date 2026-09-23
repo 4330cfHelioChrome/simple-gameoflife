@@ -8,7 +8,7 @@
   <!-- Open Graph Meta Tags -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="Conway's Game of Life">
-  <meta property="og:description" content="Interactive Conway's Game of Life simulator with customizable rules and visual trails.">
+  <meta property="og:description" content="Interactive Conway's Game of Life simulator with customizable rules, slower trails, and classic pattern presets.">
   <meta property="og:image" content="./images/opengraph.png">
   <meta property="og:url" content="https://simple-gameoflife.vercel.app">
 
@@ -291,11 +291,23 @@
 
   <!-- Bottom Controls -->
   <div class="controls">
-    <!-- Play/Pause, Random, Clear -->
+    <!-- Play/Pause, Clear -->
     <div class="control-group">
       <button class="btn btn-primary" id="btnPlay">Play</button>
-      <button class="btn" id="btnRandom">Random</button>
       <button class="btn" id="btnClear">Clear</button>
+    </div>
+
+    <!-- Pattern Preset Selector -->
+    <div class="control-group">
+      <select id="patternSelect" class="select-dropdown">
+        <option value="random">Random (랜덤)</option>
+        <option value="glider">Glider (글라이더)</option>
+        <option value="gliderGun">Gosper Glider Gun (글라이더 캐논)</option>
+        <option value="pulsar">Pulsar (펄서)</option>
+        <option value="lwss">Spaceship (경량 우주선)</option>
+        <option value="acorn">Acorn (도토리)</option>
+      </select>
+      <button class="btn" id="btnSpawnPattern">Spawn Preset</button>
     </div>
 
     <!-- Speed Slider -->
@@ -315,7 +327,7 @@
       </label>
     </div>
 
-    <!-- Presets & Text Rule Input -->
+    <!-- Rule Presets & Text Rule Input -->
     <div class="control-group">
       <select id="presetSelect" class="select-dropdown">
         <option value="B3/S23">Conway (B3/S23)</option>
@@ -351,7 +363,7 @@
         historyTrail: "Show Trail",
         play: "Play",
         pause: "Pause",
-        random: "Random",
+        spawn: "Spawn Preset",
         clear: "Clear"
       },
       ko: {
@@ -364,7 +376,7 @@
         historyTrail: "흔적 표시",
         play: "재생",
         pause: "일시정지",
-        random: "랜덤 생성",
+        spawn: "프리셋 생성",
         clear: "초기화"
       }
     };
@@ -378,8 +390,9 @@
     // UI Elements
     const langSelect = document.getElementById('langSelect');
     const btnPlay = document.getElementById('btnPlay');
-    const btnRandom = document.getElementById('btnRandom');
     const btnClear = document.getElementById('btnClear');
+    const patternSelect = document.getElementById('patternSelect');
+    const btnSpawnPattern = document.getElementById('btnSpawnPattern');
     const speedSlider = document.getElementById('speedSlider');
     const statGenPerSecond = document.getElementById('statGenPerSecond');
     const chkHistory = document.getElementById('chkHistory');
@@ -408,18 +421,47 @@
     let grid = createGrid();
     let historyGrid = createGrid();
 
-    // Fade-out Multi-step Trail Settings
-    const TRAIL_MAX = 8; // 8단계 Fade Trail
-    const TRAIL_COLORS = [
-      '#111827', // 1단계 (오래됨 - 아주 어두운 파란빛)
-      '#1e1b4b', // 2단계
-      '#2e1065', // 3단계
-      '#312e81', // 4단계
-      '#1e3a8a', // 5단계
-      '#1d4ed8', // 6단계
-      '#2563eb', // 7단계
-      '#0284c7'  // 8단계 (갓 떠난 자리 - 밝음)
-    ];
+    // Slower Multi-step Trail Settings (20단계로 천천히 사라짐)
+    const TRAIL_MAX = 20;
+    const TRAIL_COLORS = Array.from({ length: TRAIL_MAX }, (_, i) => {
+      const ratio = (i + 1) / TRAIL_MAX;
+      // 어두운 Slate 색상부터 파란색/하늘색 계열까지 부드러운 그라데이션
+      const r = Math.round(15 + ratio * (2 - 15));
+      const g = Math.round(23 + ratio * (132 - 23));
+      const b = Math.round(42 + ratio * (199 - 42));
+      return `rgb(${r}, ${g}, ${b})`;
+    });
+
+    // Patterns Data (Relative Coordinates [row, col])
+    const PATTERNS = {
+      glider: [
+        [0, 1], [1, 2], [2, 0], [2, 1], [2, 2]
+      ],
+      gliderGun: [
+        [4,0],[4,1],[5,0],[5,1],
+        [2,12],[2,13],[3,11],[3,15],[4,10],[4,16],[5,10],[5,14],[5,16],[5,17],[6,10],[6,16],[7,11],[7,15],[8,12],[8,13],
+        [0,24],[1,22],[1,24],[2,20],[2,21],[3,20],[3,21],[4,20],[4,21],[5,22],[5,24],[6,24],
+        [2,34],[2,35],[3,34],[3,35]
+      ],
+      pulsar: [
+        [0,2],[0,3],[0,4],[0,8],[0,9],[0,10],
+        [2,0],[2,5],[2,7],[2,12],
+        [3,0],[3,5],[3,7],[3,12],
+        [4,0],[4,5],[4,7],[4,12],
+        [5,2],[5,3],[5,4],[5,8],[5,9],[5,10],
+        [7,2],[7,3],[7,4],[7,8],[7,9],[7,10],
+        [8,0],[8,5],[8,7],[8,12],
+        [9,0],[9,5],[9,7],[9,12],
+        [10,0],[10,5],[10,7],[10,12],
+        [12,2],[12,3],[12,4],[12,8],[12,9],[12,10]
+      ],
+      lwss: [
+        [0,1],[0,4],[1,0],[2,0],[2,4],[3,0],[3,1],[3,2],[3,3]
+      ],
+      acorn: [
+        [0,1],[1,3],[2,0],[2,1],[2,4],[2,5],[2,6]
+      ]
+    };
 
     // Game Rules & Settings
     let birthRules = new Set([3]);
@@ -459,6 +501,51 @@
       draw();
     }
     window.addEventListener('resize', resizeCanvas);
+
+    // Pattern Spawner
+    function spawnPattern(key) {
+      grid = createGrid();
+      historyGrid = createGrid();
+      let pop = 0;
+
+      if (key === 'random') {
+        for (let r = 0; r < GRID_SIZE; r++) {
+          for (let c = 0; c < GRID_SIZE; c++) {
+            if (Math.random() < 0.25) {
+              grid[r][c] = 1;
+              historyGrid[r][c] = TRAIL_MAX;
+              pop++;
+            }
+          }
+        }
+      } else if (PATTERNS[key]) {
+        const pattern = PATTERNS[key];
+        
+        // Calculate Center Offset
+        let maxR = 0, maxC = 0;
+        pattern.forEach(([r, c]) => {
+          if (r > maxR) maxR = r;
+          if (c > maxC) maxC = c;
+        });
+
+        const startR = Math.floor((GRID_SIZE - maxR) / 2);
+        const startC = Math.floor((GRID_SIZE - maxC) / 2);
+
+        pattern.forEach(([r, c]) => {
+          const targetR = startR + r;
+          const targetC = startC + c;
+          if (targetR >= 0 && targetR < GRID_SIZE && targetC >= 0 && targetC < GRID_SIZE) {
+            grid[targetR][targetC] = 1;
+            historyGrid[targetR][targetC] = TRAIL_MAX;
+            pop++;
+          }
+        });
+      }
+
+      stats = { population: pop, totalBorn: pop, totalDied: 0, generation: 0 };
+      updateHUD();
+      draw();
+    }
 
     // Rule Buttons Initialization
     function initRuleButtons() {
@@ -537,9 +624,9 @@
 
           if (nextState === 1) {
             currentPop++;
-            historyGrid[r][c] = TRAIL_MAX; // 살아있는 세포 위치는 최대 흔적 값 유지
+            historyGrid[r][c] = TRAIL_MAX;
           } else if (historyGrid[r][c] > 0) {
-            historyGrid[r][c]--; // 빈 공간의 흔적은 세대마다 1씩 감퇴
+            historyGrid[r][c]--; // 천천히 감퇴
           }
 
           if (!isAlive && nextState === 1) bornThisStep++;
@@ -615,7 +702,7 @@
             ctx.fillStyle = '#38bdf8';
             ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
           } else if (showHistory && historyGrid[r][c] > 0) {
-            // Multi-step Decaying Trail
+            // Decaying Trail
             const trailVal = historyGrid[r][c];
             ctx.fillStyle = TRAIL_COLORS[trailVal - 1];
             ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
@@ -660,7 +747,7 @@
       txtHistoryTrail.innerText = t.historyTrail;
 
       btnPlay.innerText = isRunning ? t.pause : t.play;
-      btnRandom.innerText = t.random;
+      btnSpawnPattern.innerText = t.spawn;
       btnClear.innerText = t.clear;
     }
 
@@ -737,30 +824,20 @@
       }
     };
 
+    btnSpawnPattern.onclick = () => {
+      spawnPattern(patternSelect.value);
+    };
+
+    patternSelect.onchange = () => {
+      spawnPattern(patternSelect.value);
+    };
+
     speedSlider.oninput = () => {
       updateSpeedDisplay();
     };
 
     chkHistory.onchange = (e) => {
       showHistory = e.target.checked;
-      draw();
-    };
-
-    btnRandom.onclick = () => {
-      grid = createGrid();
-      historyGrid = createGrid();
-      let pop = 0;
-      for (let r = 0; r < GRID_SIZE; r++) {
-        for (let c = 0; c < GRID_SIZE; c++) {
-          if (Math.random() < 0.25) {
-            grid[r][c] = 1;
-            historyGrid[r][c] = TRAIL_MAX;
-            pop++;
-          }
-        }
-      }
-      stats = { population: pop, totalBorn: pop, totalDied: 0, generation: 0 };
-      updateHUD();
       draw();
     };
 
@@ -787,7 +864,7 @@
     initRuleButtons();
     updateSpeedDisplay();
     resizeCanvas();
-    btnRandom.click();
+    spawnPattern('gliderGun'); // 기본 프리셋으로 글라이더 캐논 생성
   </script>
 </body>
 </html>
