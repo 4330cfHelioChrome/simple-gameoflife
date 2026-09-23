@@ -408,7 +408,20 @@
     let grid = createGrid();
     let historyGrid = createGrid();
 
-    // Game Rules & History Settings
+    // Fade-out Multi-step Trail Settings
+    const TRAIL_MAX = 8; // 8단계 Fade Trail
+    const TRAIL_COLORS = [
+      '#111827', // 1단계 (오래됨 - 아주 어두운 파란빛)
+      '#1e1b4b', // 2단계
+      '#2e1065', // 3단계
+      '#312e81', // 4단계
+      '#1e3a8a', // 5단계
+      '#1d4ed8', // 6단계
+      '#2563eb', // 7단계
+      '#0284c7'  // 8단계 (갓 떠난 자리 - 밝음)
+    ];
+
+    // Game Rules & Settings
     let birthRules = new Set([3]);
     let survivalRules = new Set([2, 3]);
     let showHistory = true;
@@ -524,8 +537,11 @@
 
           if (nextState === 1) {
             currentPop++;
-            historyGrid[r][c] = 1;
+            historyGrid[r][c] = TRAIL_MAX; // 살아있는 세포 위치는 최대 흔적 값 유지
+          } else if (historyGrid[r][c] > 0) {
+            historyGrid[r][c]--; // 빈 공간의 흔적은 세대마다 1씩 감퇴
           }
+
           if (!isAlive && nextState === 1) bornThisStep++;
           if (isAlive && nextState === 0) diedThisStep++;
         }
@@ -591,14 +607,17 @@
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-      // Render Cells
+      // Render Cells & Trails
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
           if (grid[r][c] === 1) {
+            // Live Cell
             ctx.fillStyle = '#38bdf8';
             ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-          } else if (showHistory && historyGrid[r][c] === 1) {
-            ctx.fillStyle = '#1e3a8a';
+          } else if (showHistory && historyGrid[r][c] > 0) {
+            // Multi-step Decaying Trail
+            const trailVal = historyGrid[r][c];
+            ctx.fillStyle = TRAIL_COLORS[trailVal - 1];
             ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
           }
         }
@@ -679,7 +698,7 @@
 
         if (row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE) {
           grid[row][col] = grid[row][col] ? 0 : 1;
-          if (grid[row][col] === 1) historyGrid[row][col] = 1;
+          if (grid[row][col] === 1) historyGrid[row][col] = TRAIL_MAX;
           stats.population += grid[row][col] ? 1 : -1;
           updateHUD();
           draw();
@@ -735,7 +754,7 @@
         for (let c = 0; c < GRID_SIZE; c++) {
           if (Math.random() < 0.25) {
             grid[r][c] = 1;
-            historyGrid[r][c] = 1;
+            historyGrid[r][c] = TRAIL_MAX;
             pop++;
           }
         }
