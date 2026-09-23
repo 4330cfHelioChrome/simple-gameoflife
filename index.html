@@ -1,9 +1,16 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conway's Game of Life - Custom Bn/Sn</title>
+  <title>Conway's Game of Life - Custom Rules</title>
+
+  <!-- 1. Favicon Placeholder (Replace href with your icon path) -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧬</text></svg>">
+
+  <!-- 2. Vercel Analytics Script -->
+  <script defer src="/_vercel/insights/script.js"></script>
+
   <style>
     * {
       box-sizing: border-box;
@@ -33,7 +40,15 @@
       cursor: grabbing;
     }
 
-    /* HUD Stats (좌측 상단) */
+    /* Top Right Controls (Language Selector) */
+    .top-right-bar {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 10;
+    }
+
+    /* HUD Stats (Top Left) */
     .hud {
       position: absolute;
       top: 16px;
@@ -45,11 +60,11 @@
       border-radius: 12px;
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
       pointer-events: none;
-      min-width: 180px;
+      min-width: 210px;
     }
 
     .hud h2 {
-      font-size: 14px;
+      font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: #94a3b8;
@@ -69,7 +84,7 @@
       color: #38bdf8;
     }
 
-    /* Controller (하단 바) */
+    /* Controller (Bottom Bar) */
     .controls {
       position: absolute;
       bottom: 20px;
@@ -86,7 +101,7 @@
       align-items: center;
       justify-content: center;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
-      max-width: 90vw;
+      max-width: 95vw;
     }
 
     .control-group {
@@ -121,11 +136,24 @@
       background: #0369a1;
     }
 
-    /* Slider */
-    label {
-      font-size: 12px;
+    /* Slider & Labels */
+    .speed-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .speed-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
       color: #94a3b8;
       font-weight: 600;
+    }
+
+    .speed-val {
+      color: #38bdf8;
+      font-family: monospace;
     }
 
     input[type="range"] {
@@ -175,62 +203,78 @@
       border-color: #38bdf8;
     }
 
-    .preset-select {
+    .select-dropdown {
       background: #1e293b;
       color: #f8fafc;
       border: 1px solid #475569;
-      padding: 6px 10px;
+      padding: 6px 12px;
       border-radius: 8px;
       font-size: 12px;
+      font-weight: 600;
       outline: none;
       cursor: pointer;
+    }
+
+    .select-dropdown:hover {
+      border-color: #38bdf8;
     }
   </style>
 </head>
 <body>
+
+  <!-- Language Switcher (Top Right) -->
+  <div class="top-right-bar">
+    <select id="langSelect" class="select-dropdown">
+      <option value="en" selected>English</option>
+      <option value="ko">한국어</option>
+    </select>
+  </div>
 
   <!-- Canvas -->
   <canvas id="gameCanvas"></canvas>
 
   <!-- HUD Stats -->
   <div class="hud">
-    <h2>시뮬레이션 통계</h2>
+    <h2 id="txtHudTitle">Simulation Stats</h2>
     <div class="stat-row">
-      <span>현재 개체 수:</span>
+      <span id="txtPopulation">Population:</span>
       <span class="stat-value" id="statPopulation">0</span>
     </div>
     <div class="stat-row">
-      <span>총 태어난 수:</span>
+      <span id="txtBorn">Total Born:</span>
       <span class="stat-value" id="statBorn">0</span>
     </div>
     <div class="stat-row">
-      <span>총 죽은 수:</span>
+      <span id="txtDied">Total Died:</span>
       <span class="stat-value" id="statDied">0</span>
     </div>
     <div class="stat-row">
-      <span>진행 세대:</span>
+      <span id="txtGen">Generation:</span>
       <span class="stat-value" id="statGen">0</span>
     </div>
   </div>
 
   <!-- Bottom Controls -->
   <div class="controls">
-    <!-- Play/Pause, Reset, Random -->
+    <!-- Play/Pause, Random, Clear -->
     <div class="control-group">
-      <button class="btn btn-primary" id="btnPlay">재생</button>
-      <button class="btn" id="btnRandom">랜덤 생성</button>
-      <button class="btn" id="btnClear">초기화</button>
+      <button class="btn btn-primary" id="btnPlay">Play</button>
+      <button class="btn" id="btnRandom">Random</button>
+      <button class="btn" id="btnClear">Clear</button>
     </div>
 
-    <!-- Speed Slider -->
-    <div class="control-group">
-      <label for="speedSlider">속도</label>
-      <input type="range" id="speedSlider" min="10" max="500" value="100" step="10">
+    <!-- Speed Slider with Gen/Frame display -->
+    <div class="control-group speed-container">
+      <div class="speed-header">
+        <span id="txtSpeedLabel">Speed:</span>
+        <span class="speed-val" id="statGenPerFrame">0.17 Gen/Frame</span>
+      </div>
+      <input type="range" id="speedSlider" min="1" max="120" value="10">
     </div>
 
     <!-- Presets -->
     <div class="control-group">
-      <select id="presetSelect" class="preset-select">
+      <select id="presetSelect" class="select-dropdown">
         <option value="B3/S23">Conway (B3/S23)</option>
         <option value="B36/S23">HighLife (B36/S23)</option>
         <option value="B2/S">Seeds (B2/S)</option>
@@ -243,40 +287,78 @@
     <div class="rule-box">
       <div class="rule-row" id="bRules">
         <span class="rule-title">B:</span>
-        <!-- Buttons 0~8 generated via JS -->
       </div>
       <div class="rule-row" id="sRules">
         <span class="rule-title">S:</span>
-        <!-- Buttons 0~8 generated via JS -->
       </div>
     </div>
   </div>
 
   <script>
-    // Canvas & Context Setup
+    // i18n Translations Dictionary
+    const translations = {
+      en: {
+        hudTitle: "Simulation Stats",
+        population: "Population:",
+        born: "Total Born:",
+        died: "Total Died:",
+        gen: "Generation:",
+        speed: "Speed:",
+        play: "Play",
+        pause: "Pause",
+        random: "Random",
+        clear: "Clear"
+      },
+      ko: {
+        hudTitle: "시뮬레이션 통계",
+        population: "현재 개체 수:",
+        born: "총 태어난 수:",
+        died: "총 죽은 수:",
+        gen: "진행 세대:",
+        speed: "속도:",
+        play: "재생",
+        pause: "일시정지",
+        random: "랜덤 생성",
+        clear: "초기화"
+      }
+    };
+
+    let currentLang = "en";
+
+    // Canvas & Context
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
     // UI Elements
+    const langSelect = document.getElementById('langSelect');
     const btnPlay = document.getElementById('btnPlay');
     const btnRandom = document.getElementById('btnRandom');
     const btnClear = document.getElementById('btnClear');
     const speedSlider = document.getElementById('speedSlider');
+    const statGenPerFrame = document.getElementById('statGenPerFrame');
     const presetSelect = document.getElementById('presetSelect');
     const bRulesContainer = document.getElementById('bRules');
     const sRulesContainer = document.getElementById('sRules');
+
+    // Text Elements for i18n
+    const txtHudTitle = document.getElementById('txtHudTitle');
+    const txtPopulation = document.getElementById('txtPopulation');
+    const txtBorn = document.getElementById('txtBorn');
+    const txtDied = document.getElementById('txtDied');
+    const txtGen = document.getElementById('txtGen');
+    const txtSpeedLabel = document.getElementById('txtSpeedLabel');
 
     const statPopulation = document.getElementById('statPopulation');
     const statBorn = document.getElementById('statBorn');
     const statDied = document.getElementById('statDied');
     const statGen = document.getElementById('statGen');
 
-    // Grid Dimensions
-    const GRID_SIZE = 150; // 150x150 cells
+    // Grid Specs
+    const GRID_SIZE = 150;
     const CELL_SIZE = 16;
     let grid = createGrid();
 
-    // Game Rules (Sets for O(1) lookups)
+    // Game Rules
     let birthRules = new Set([3]);
     let survivalRules = new Set([2, 3]);
 
@@ -288,10 +370,11 @@
       generation: 0
     };
 
-    // State Variables
+    // Animation & Speed Control
     let isRunning = false;
-    let timer = null;
-    let speed = 100; // ms per tick
+    let speedValue = 10; // Slider 1 to 120
+    let stepAccumulator = 0;
+    let animationFrameId = null;
 
     // Viewport State (Zoom & Pan)
     let scale = 1.0;
@@ -302,12 +385,10 @@
     let startX = 0, startY = 0;
     let dragDistance = 0;
 
-    // Helper: Create 2D Array
     function createGrid() {
       return Array.from({ length: GRID_SIZE }, () => new Uint8Array(GRID_SIZE));
     }
 
-    // Resize Canvas
     function resizeCanvas() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -315,7 +396,7 @@
     }
     window.addEventListener('resize', resizeCanvas);
 
-    // Initialize Rule UI Buttons
+    // Rule Buttons Initialization
     function initRuleButtons() {
       for (let i = 0; i <= 8; i++) {
         // Birth Buttons
@@ -351,7 +432,7 @@
       });
     }
 
-    // Game Logic Update Step
+    // Step Execution
     function step() {
       const nextGrid = createGrid();
       let bornThisStep = 0;
@@ -363,13 +444,7 @@
           const neighbors = countNeighbors(r, c);
           const isAlive = grid[r][c] === 1;
 
-          let nextState = 0;
-          if (isAlive) {
-            nextState = survivalRules.has(neighbors) ? 1 : 0;
-          } else {
-            nextState = birthRules.has(neighbors) ? 1 : 0;
-          }
-
+          let nextState = isAlive ? (survivalRules.has(neighbors) ? 1 : 0) : (birthRules.has(neighbors) ? 1 : 0);
           nextGrid[r][c] = nextState;
 
           if (nextState === 1) currentPop++;
@@ -383,9 +458,6 @@
       stats.totalBorn += bornThisStep;
       stats.totalDied += diedThisStep;
       stats.generation++;
-
-      updateHUD();
-      draw();
     }
 
     function countNeighbors(r, c) {
@@ -408,7 +480,26 @@
       statGen.innerText = stats.generation;
     }
 
-    // Render Function
+    // Main Game Loop (Targeting 60FPS)
+    function gameLoop() {
+      if (isRunning) {
+        // Calculate Generations per Frame ratio
+        // Slider value 60 = 1 Gen / Frame (60 Gen/sec)
+        const genPerFrame = speedValue / 60;
+        stepAccumulator += genPerFrame;
+
+        while (stepAccumulator >= 1) {
+          step();
+          stepAccumulator -= 1;
+        }
+
+        updateHUD();
+        draw();
+        animationFrameId = requestAnimationFrame(gameLoop);
+      }
+    }
+
+    // Canvas Drawing with Grid Lines
     function draw() {
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -417,24 +508,69 @@
       ctx.translate(offsetX, offsetY);
       ctx.scale(scale, scale);
 
+      const totalWidth = GRID_SIZE * CELL_SIZE;
+      const totalHeight = GRID_SIZE * CELL_SIZE;
+
       // Grid Background
       ctx.fillStyle = '#1e293b';
-      ctx.fillRect(0, 0, GRID_SIZE * CELL_SIZE, GRID_SIZE * CELL_SIZE);
+      ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-      // Draw Cells
+      // Render Cells
       ctx.fillStyle = '#38bdf8';
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
           if (grid[r][c] === 1) {
-            ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE - 1, CELL_SIZE - 1);
+            ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
           }
         }
       }
 
+      // Render Thin Grid Lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1 / scale;
+      ctx.beginPath();
+      for (let x = 0; x <= totalWidth; x += CELL_SIZE) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, totalHeight);
+      }
+      for (let y = 0; y <= totalHeight; y += CELL_SIZE) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(totalWidth, y);
+      }
+      ctx.stroke();
+
       ctx.restore();
     }
 
-    // Canvas Mouse / Touch Controls (Pan & Zoom)
+    // Update Speed Display (Gen / Frame)
+    function updateSpeedDisplay() {
+      speedValue = parseInt(speedSlider.value, 10);
+      const genPerFrame = (speedValue / 60).toFixed(2);
+      statGenPerFrame.innerText = `${genPerFrame} Gen/Frame`;
+    }
+
+    // Language Change Handler
+    function changeLanguage(lang) {
+      currentLang = lang;
+      const t = translations[lang];
+
+      txtHudTitle.innerText = t.hudTitle;
+      txtPopulation.innerText = t.population;
+      txtBorn.innerText = t.born;
+      txtDied.innerText = t.died;
+      txtGen.innerText = t.gen;
+      txtSpeedLabel.innerText = t.speed;
+
+      btnPlay.innerText = isRunning ? t.pause : t.play;
+      btnRandom.innerText = t.random;
+      btnClear.innerText = t.clear;
+    }
+
+    langSelect.onchange = (e) => {
+      changeLanguage(e.target.value);
+    };
+
+    // Canvas Pan & Zoom Mouse Events
     canvas.addEventListener('mousedown', (e) => {
       isDragging = true;
       startX = e.clientX - offsetX;
@@ -455,7 +591,6 @@
 
     window.addEventListener('mouseup', (e) => {
       if (isDragging && dragDistance < 5) {
-        // Toggle Cell on Click (not Drag)
         const rect = canvas.getBoundingClientRect();
         const mouseX = (e.clientX - rect.left - offsetX) / scale;
         const mouseY = (e.clientY - rect.top - offsetY) / scale;
@@ -473,13 +608,11 @@
       isDragging = false;
     });
 
-    // Zoom on Wheel
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
       const newScale = Math.min(Math.max(0.2, scale * zoomFactor), 5.0);
 
-      // Zoom centered at mouse cursor
       const mouseX = e.clientX;
       const mouseY = e.clientY;
 
@@ -493,22 +626,20 @@
     // Controls Event Handlers
     btnPlay.onclick = () => {
       isRunning = !isRunning;
-      btnPlay.innerText = isRunning ? '일시정지' : '재생';
+      const t = translations[currentLang];
+      btnPlay.innerText = isRunning ? t.pause : t.play;
       btnPlay.classList.toggle('btn-primary', !isRunning);
 
       if (isRunning) {
-        timer = setInterval(step, 510 - speed);
+        stepAccumulator = 0;
+        gameLoop();
       } else {
-        clearInterval(timer);
+        cancelAnimationFrame(animationFrameId);
       }
     };
 
-    speedSlider.oninput = (e) => {
-      speed = parseInt(e.target.value, 10);
-      if (isRunning) {
-        clearInterval(timer);
-        timer = setInterval(step, 510 - speed);
-      }
+    speedSlider.oninput = () => {
+      updateSpeedDisplay();
     };
 
     btnRandom.onclick = () => {
@@ -545,10 +676,11 @@
       updateRuleUI();
     };
 
-    // Initialize Application
+    // App Initialization
     initRuleButtons();
+    updateSpeedDisplay();
     resizeCanvas();
-    btnRandom.click(); // Initial random population
+    btnRandom.click();
   </script>
 </body>
 </html>
