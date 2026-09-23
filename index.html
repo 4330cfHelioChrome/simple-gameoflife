@@ -3,12 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conway's Game of Life - Custom Rules</title>
+  <title>Conway's Game of Life</title>
 
-  <!-- 1. Favicon Placeholder (Replace href with your icon path) -->
+  <!-- Open Graph Meta Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Conway's Game of Life">
+  <meta property="og:description" content="Interactive Conway's Game of Life simulator with customizable rules and visual trails.">
+  <meta property="og:image" content="./images/opengraph.png">
+  <meta property="og:url" content="https://simple-gameoflife.vercel.app">
+
+  <!-- Favicon Placeholder -->
   <link rel="icon" type="image/png" href="./images/favicon.png">
 
-  <!-- 2. Vercel Analytics Script -->
+  <!-- Vercel Analytics Script -->
   <script defer src="/_vercel/insights/script.js"></script>
 
   <style>
@@ -97,7 +104,7 @@
       border-radius: 16px;
       display: flex;
       flex-wrap: wrap;
-      gap: 20px;
+      gap: 16px;
       align-items: center;
       justify-content: center;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
@@ -161,7 +168,25 @@
       cursor: pointer;
     }
 
-    /* Bn/Sn Rule Selector */
+    /* Checkbox Option */
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #cbd5e1;
+      cursor: pointer;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      accent-color: #38bdf8;
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+    }
+
+    /* Rule Selector & Input */
     .rule-box {
       display: flex;
       flex-direction: column;
@@ -203,7 +228,7 @@
       border-color: #38bdf8;
     }
 
-    .select-dropdown {
+    .select-dropdown, .text-input {
       background: #1e293b;
       color: #f8fafc;
       border: 1px solid #475569;
@@ -212,11 +237,21 @@
       font-size: 12px;
       font-weight: 600;
       outline: none;
+    }
+
+    .select-dropdown {
       cursor: pointer;
     }
 
-    .select-dropdown:hover {
+    .select-dropdown:hover, .text-input:focus {
       border-color: #38bdf8;
+    }
+
+    .rule-input-box {
+      width: 90px;
+      font-family: monospace;
+      text-transform: uppercase;
+      text-align: center;
     }
   </style>
 </head>
@@ -263,16 +298,24 @@
       <button class="btn" id="btnClear">Clear</button>
     </div>
 
-    <!-- Speed Slider with Gen/Frame display -->
+    <!-- Speed Slider -->
     <div class="control-group speed-container">
       <div class="speed-header">
         <span id="txtSpeedLabel">Speed:</span>
-        <span class="speed-val" id="statGenPerFrame">0.17 Gen/Frame</span>
+        <span class="speed-val" id="statGenPerSecond">10 / Second</span>
       </div>
       <input type="range" id="speedSlider" min="1" max="120" value="10">
     </div>
 
-    <!-- Presets -->
+    <!-- Trail / History Toggle -->
+    <div class="control-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkHistory" checked>
+        <span id="txtHistoryTrail">Show Trail</span>
+      </label>
+    </div>
+
+    <!-- Presets & Text Rule Input -->
     <div class="control-group">
       <select id="presetSelect" class="select-dropdown">
         <option value="B3/S23">Conway (B3/S23)</option>
@@ -281,6 +324,7 @@
         <option value="B3678/S34678">Day & Night (B3678/S34678)</option>
         <option value="B1/S12">Flock (B1/S12)</option>
       </select>
+      <input type="text" id="ruleInput" class="text-input rule-input-box" value="B3/S23" placeholder="B3/S23">
     </div>
 
     <!-- Bn/Sn Rules Toggles -->
@@ -304,6 +348,7 @@
         died: "Total Died:",
         gen: "Generation:",
         speed: "Speed:",
+        historyTrail: "Show Trail",
         play: "Play",
         pause: "Pause",
         random: "Random",
@@ -316,6 +361,7 @@
         died: "총 죽은 수:",
         gen: "진행 세대:",
         speed: "속도:",
+        historyTrail: "흔적 표시",
         play: "재생",
         pause: "일시정지",
         random: "랜덤 생성",
@@ -335,8 +381,10 @@
     const btnRandom = document.getElementById('btnRandom');
     const btnClear = document.getElementById('btnClear');
     const speedSlider = document.getElementById('speedSlider');
-    const statGenPerFrame = document.getElementById('statGenPerFrame');
+    const statGenPerSecond = document.getElementById('statGenPerSecond');
+    const chkHistory = document.getElementById('chkHistory');
     const presetSelect = document.getElementById('presetSelect');
+    const ruleInput = document.getElementById('ruleInput');
     const bRulesContainer = document.getElementById('bRules');
     const sRulesContainer = document.getElementById('sRules');
 
@@ -347,6 +395,7 @@
     const txtDied = document.getElementById('txtDied');
     const txtGen = document.getElementById('txtGen');
     const txtSpeedLabel = document.getElementById('txtSpeedLabel');
+    const txtHistoryTrail = document.getElementById('txtHistoryTrail');
 
     const statPopulation = document.getElementById('statPopulation');
     const statBorn = document.getElementById('statBorn');
@@ -357,10 +406,12 @@
     const GRID_SIZE = 150;
     const CELL_SIZE = 16;
     let grid = createGrid();
+    let historyGrid = createGrid();
 
-    // Game Rules
+    // Game Rules & History Settings
     let birthRules = new Set([3]);
     let survivalRules = new Set([2, 3]);
+    let showHistory = true;
 
     // Statistics
     let stats = {
@@ -372,7 +423,7 @@
 
     // Animation & Speed Control
     let isRunning = false;
-    let speedValue = 10; // Slider 1 to 120
+    let speedValue = 10;
     let stepAccumulator = 0;
     let animationFrameId = null;
 
@@ -406,7 +457,7 @@
         bBtn.onclick = () => {
           if (birthRules.has(i)) birthRules.delete(i);
           else birthRules.add(i);
-          bBtn.classList.toggle('active');
+          syncRuleToUI();
         };
         bRulesContainer.appendChild(bBtn);
 
@@ -417,7 +468,7 @@
         sBtn.onclick = () => {
           if (survivalRules.has(i)) survivalRules.delete(i);
           else survivalRules.add(i);
-          sBtn.classList.toggle('active');
+          syncRuleToUI();
         };
         sRulesContainer.appendChild(sBtn);
       }
@@ -430,6 +481,30 @@
       Array.from(sRulesContainer.children).forEach((child, idx) => {
         if (idx > 0) child.classList.toggle('active', survivalRules.has(idx - 1));
       });
+    }
+
+    function syncRuleToUI() {
+      updateRuleUI();
+      const bStr = Array.from(birthRules).sort((a,b)=>a-b).join('');
+      const sStr = Array.from(survivalRules).sort((a,b)=>a-b).join('');
+      const ruleStr = `B${bStr}/S${sStr}`;
+      ruleInput.value = ruleStr;
+      
+      let matchedOption = Array.from(presetSelect.options).find(opt => opt.value === ruleStr);
+      if (matchedOption) {
+        presetSelect.value = ruleStr;
+      }
+    }
+
+    function parseRuleString(str) {
+      const match = str.trim().toUpperCase().match(/^B([0-8]*)\/S([0-8]*)$/);
+      if (match) {
+        birthRules = new Set(match[1].split('').map(Number));
+        survivalRules = new Set(match[2].split('').map(Number));
+        updateRuleUI();
+        return true;
+      }
+      return false;
     }
 
     // Step Execution
@@ -447,7 +522,10 @@
           let nextState = isAlive ? (survivalRules.has(neighbors) ? 1 : 0) : (birthRules.has(neighbors) ? 1 : 0);
           nextGrid[r][c] = nextState;
 
-          if (nextState === 1) currentPop++;
+          if (nextState === 1) {
+            currentPop++;
+            historyGrid[r][c] = 1;
+          }
           if (!isAlive && nextState === 1) bornThisStep++;
           if (isAlive && nextState === 0) diedThisStep++;
         }
@@ -480,11 +558,9 @@
       statGen.innerText = stats.generation;
     }
 
-    // Main Game Loop (Targeting 60FPS)
+    // Main Game Loop
     function gameLoop() {
       if (isRunning) {
-        // Calculate Generations per Frame ratio
-        // Slider value 60 = 1 Gen / Frame (60 Gen/sec)
         const genPerFrame = speedValue / 60;
         stepAccumulator += genPerFrame;
 
@@ -499,7 +575,7 @@
       }
     }
 
-    // Canvas Drawing with Grid Lines
+    // Canvas Drawing
     function draw() {
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -516,16 +592,19 @@
       ctx.fillRect(0, 0, totalWidth, totalHeight);
 
       // Render Cells
-      ctx.fillStyle = '#38bdf8';
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
           if (grid[r][c] === 1) {
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          } else if (showHistory && historyGrid[r][c] === 1) {
+            ctx.fillStyle = '#1e3a8a';
             ctx.fillRect(c * CELL_SIZE, r * CELL_SIZE, CELL_SIZE, CELL_SIZE);
           }
         }
       }
 
-      // Render Thin Grid Lines
+      // Render Grid Lines
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1 / scale;
       ctx.beginPath();
@@ -542,11 +621,10 @@
       ctx.restore();
     }
 
-    // Update Speed Display (Gen / Frame)
+    // Update Speed Display
     function updateSpeedDisplay() {
       speedValue = parseInt(speedSlider.value, 10);
-      const genPerFrame = (speedValue / 60).toFixed(2);
-      statGenPerFrame.innerText = `${genPerFrame} Gen/Frame`;
+      statGenPerSecond.innerText = `${speedValue} / Second`;
     }
 
     // Language Change Handler
@@ -560,6 +638,7 @@
       txtDied.innerText = t.died;
       txtGen.innerText = t.gen;
       txtSpeedLabel.innerText = t.speed;
+      txtHistoryTrail.innerText = t.historyTrail;
 
       btnPlay.innerText = isRunning ? t.pause : t.play;
       btnRandom.innerText = t.random;
@@ -570,7 +649,7 @@
       changeLanguage(e.target.value);
     };
 
-    // Canvas Pan & Zoom Mouse Events
+    // Canvas Mouse Events
     canvas.addEventListener('mousedown', (e) => {
       isDragging = true;
       startX = e.clientX - offsetX;
@@ -600,6 +679,7 @@
 
         if (row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE) {
           grid[row][col] = grid[row][col] ? 0 : 1;
+          if (grid[row][col] === 1) historyGrid[row][col] = 1;
           stats.population += grid[row][col] ? 1 : -1;
           updateHUD();
           draw();
@@ -623,7 +703,7 @@
       draw();
     }, { passive: false });
 
-    // Controls Event Handlers
+    // Event Handlers
     btnPlay.onclick = () => {
       isRunning = !isRunning;
       const t = translations[currentLang];
@@ -642,13 +722,20 @@
       updateSpeedDisplay();
     };
 
+    chkHistory.onchange = (e) => {
+      showHistory = e.target.checked;
+      draw();
+    };
+
     btnRandom.onclick = () => {
       grid = createGrid();
+      historyGrid = createGrid();
       let pop = 0;
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
           if (Math.random() < 0.25) {
             grid[r][c] = 1;
+            historyGrid[r][c] = 1;
             pop++;
           }
         }
@@ -661,6 +748,7 @@
     btnClear.onclick = () => {
       if (isRunning) btnPlay.click();
       grid = createGrid();
+      historyGrid = createGrid();
       stats = { population: 0, totalBorn: 0, totalDied: 0, generation: 0 };
       updateHUD();
       draw();
@@ -668,12 +756,12 @@
 
     presetSelect.onchange = (e) => {
       const val = e.target.value;
-      const [bPart, sPart] = val.split('/');
+      ruleInput.value = val;
+      parseRuleString(val);
+    };
 
-      birthRules = new Set(bPart.replace('B', '').split('').map(Number));
-      survivalRules = new Set(sPart.replace('S', '').split('').map(Number));
-
-      updateRuleUI();
+    ruleInput.oninput = (e) => {
+      parseRuleString(e.target.value);
     };
 
     // App Initialization
