@@ -611,59 +611,47 @@
 
     // Step Execution
     function step() {
-      const nextGrid = createGrid();
-      let bornThisStep = 0;
-      let diedThisStep = 0;
-      let currentPop = 0;
-
-      for (let r = 0; r < GRID_SIZE; r++) {
-        for (let c = 0; c < GRID_SIZE; c++) {
-          const neighbors = countNeighbors(r, c);
-          const isAlive = grid[r][c] === 1;
-
-          let nextState = isAlive ? (survivalRules.has(neighbors) ? 1 : 0) : (birthRules.has(neighbors) ? 1 : 0);
-          nextGrid[r][c] = nextState;
-
-          // step() 함수 최상단 또는 시작 부분에 프레임 카운터 증가 및 감퇴 여부 체크
-          const shouldDecayTrail = (trailFrameCount % TRAIL_DECAY_INTERVAL === 0);
-          
-          for (let r = 0; r < GRID_SIZE; r++) {
-            for (let c = 0; c < GRID_SIZE; c++) {
-              const neighbors = countNeighbors(r, c);
-              const isAlive = grid[r][c] === 1;
-          
-              let nextState = isAlive ? (survivalRules.has(neighbors) ? 1 : 0) : (birthRules.has(neighbors) ? 1 : 0);
-              nextGrid[r][c] = nextState;
-          
-              if (nextState === 1) {
-                currentPop++;
-                historyGrid[r][c] = TRAIL_MAX;
-              } else if (historyGrid[r][c] > 0) {
-                // 지정한 프레임 간격(TRAIL_DECAY_INTERVAL)일 때만 1단계 감소
-                if (shouldDecayTrail) {
-                  historyGrid[r][c]--;
-                }
-              }
-          
-              if (!isAlive && nextState === 1) bornThisStep++;
-              if (isAlive && nextState === 0) diedThisStep++;
-            }
+    const nextGrid = createGrid();
+    let bornThisStep = 0;
+    let diedThisStep = 0;
+    let currentPop = 0;
+  
+    // 1. 프레임 카운터 체크 (for문 들어가기 전 1번만 수행)
+    const shouldDecayTrail = (trailFrameCount % TRAIL_DECAY_INTERVAL === 0);
+  
+    // 2. 단 일 (Single) 2중 for문
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        const neighbors = countNeighbors(r, c);
+        const isAlive = grid[r][c] === 1;
+  
+        let nextState = isAlive ? (survivalRules.has(neighbors) ? 1 : 0) : (birthRules.has(neighbors) ? 1 : 0);
+        nextGrid[r][c] = nextState;
+  
+        if (nextState === 1) {
+          currentPop++;
+          historyGrid[r][c] = TRAIL_MAX;
+        } else if (historyGrid[r][c] > 0) {
+          if (shouldDecayTrail) {
+            historyGrid[r][c]--;
           }
-
-          // step() 함수 맨 끝에서 카운터 증가
-          trailFrameCount++;
-
-          if (!isAlive && nextState === 1) bornThisStep++;
-          if (isAlive && nextState === 0) diedThisStep++;
         }
+  
+        if (!isAlive && nextState === 1) bornThisStep++;
+        if (isAlive && nextState === 0) diedThisStep++;
       }
-
-      grid = nextGrid;
-      stats.population = currentPop;
-      stats.totalBorn += bornThisStep;
-      stats.totalDied += diedThisStep;
-      stats.generation++;
     }
+  
+    // 3. for문이 전부 끝난 후 카운터 증가
+    trailFrameCount++;
+  
+    // 4. 상태 및 통계 업데이트
+    grid = nextGrid;
+    stats.population = currentPop;
+    stats.totalBorn += bornThisStep;
+    stats.totalDied += diedThisStep;
+    stats.generation++;
+  }
 
     function countNeighbors(r, c) {
       let count = 0;
