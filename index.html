@@ -300,12 +300,12 @@
     <!-- Pattern Preset Selector -->
     <div class="control-group">
       <select id="patternSelect" class="select-dropdown">
-        <option value="random">Random (랜덤)</option>
-        <option value="glider">Glider (글라이더)</option>
-        <option value="gliderGun">Gosper Glider Gun (글라이더 캐논)</option>
-        <option value="pulsar">Pulsar (펄서)</option>
-        <option value="lwss">Spaceship (경량 우주선)</option>
-        <option value="acorn">Acorn (도토리)</option>
+        <option value="random">Random</option>
+        <option value="glider">Glider</option>
+        <option value="gliderGun">Gosper Glider Gun</option>
+        <option value="pulsar">Pulsar</option>
+        <option value="lwss">Spaceship</option>
+        <option value="acorn">Acorn</option>
       </select>
       <button class="btn" id="btnSpawnPattern">Spawn Preset</button>
     </div>
@@ -324,6 +324,14 @@
       <label class="checkbox-label">
         <input type="checkbox" id="chkHistory" checked>
         <span id="txtHistoryTrail">Show Trail</span>
+      </label>
+    </div>
+
+    <!-- Wrap Edges Toggle -->
+    <div class="control-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="chkWrap" checked>
+        <span id="txtWrapEdges">Wrap Edges</span>
       </label>
     </div>
 
@@ -361,10 +369,19 @@
         gen: "Generation:",
         speed: "Speed:",
         historyTrail: "Show Trail",
+        wrapEdges: "Wrap Edges",
         play: "Play",
         pause: "Pause",
         spawn: "Spawn Preset",
-        clear: "Clear"
+        clear: "Clear",
+        patterns: {
+          random: "Random",
+          glider: "Glider",
+          gliderGun: "Gosper Glider Gun",
+          pulsar: "Pulsar",
+          lwss: "Spaceship",
+          acorn: "Acorn"
+        }
       },
       ko: {
         hudTitle: "시뮬레이션 통계",
@@ -374,10 +391,19 @@
         gen: "진행 세대:",
         speed: "속도:",
         historyTrail: "흔적 표시",
+        wrapEdges: "화면 연결 (워프)",
         play: "재생",
         pause: "일시정지",
         spawn: "프리셋 생성",
-        clear: "초기화"
+        clear: "초기화",
+        patterns: {
+          random: "랜덤",
+          glider: "글라이더",
+          gliderGun: "글라이더 캐논",
+          pulsar: "펄서",
+          lwss: "경량 우주선",
+          acorn: "도토리"
+        }
       }
     };
 
@@ -396,6 +422,7 @@
     const speedSlider = document.getElementById('speedSlider');
     const statGenPerSecond = document.getElementById('statGenPerSecond');
     const chkHistory = document.getElementById('chkHistory');
+    const chkWrap = document.getElementById('chkWrap');
     const presetSelect = document.getElementById('presetSelect');
     const ruleInput = document.getElementById('ruleInput');
     const bRulesContainer = document.getElementById('bRules');
@@ -409,6 +436,7 @@
     const txtGen = document.getElementById('txtGen');
     const txtSpeedLabel = document.getElementById('txtSpeedLabel');
     const txtHistoryTrail = document.getElementById('txtHistoryTrail');
+    const txtWrapEdges = document.getElementById('txtWrapEdges');
 
     const statPopulation = document.getElementById('statPopulation');
     const statBorn = document.getElementById('statBorn');
@@ -425,7 +453,6 @@
     const TRAIL_MAX = 20;
     const TRAIL_COLORS = Array.from({ length: TRAIL_MAX }, (_, i) => {
       const ratio = (i + 1) / TRAIL_MAX;
-      // 어두운 Slate 색상부터 파란색/하늘색 계열까지 부드러운 그라데이션
       const r = Math.round(15 + ratio * (2 - 15));
       const g = Math.round(23 + ratio * (132 - 23));
       const b = Math.round(42 + ratio * (199 - 42));
@@ -467,6 +494,7 @@
     let birthRules = new Set([3]);
     let survivalRules = new Set([2, 3]);
     let showHistory = true;
+    let wrapEdges = true;
 
     // Statistics
     let stats = {
@@ -482,7 +510,7 @@
     let stepAccumulator = 0;
     let animationFrameId = null;
     let trailFrameCount = 0;
-    const TRAIL_DECAY_INTERVAL = 3; // 숫자가 클수록 흔적이 더 천천히 사라짐 (예: 3세대에 1단계 감소)
+    const TRAIL_DECAY_INTERVAL = 3;
 
     // Viewport State (Zoom & Pan)
     let scale = 1.0;
@@ -523,7 +551,6 @@
       } else if (PATTERNS[key]) {
         const pattern = PATTERNS[key];
         
-        // Calculate Center Offset
         let maxR = 0, maxC = 0;
         pattern.forEach(([r, c]) => {
           if (r > maxR) maxR = r;
@@ -611,56 +638,61 @@
 
     // Step Execution
     function step() {
-    const nextGrid = createGrid();
-    let bornThisStep = 0;
-    let diedThisStep = 0;
-    let currentPop = 0;
-  
-    // 1. 프레임 카운터 체크 (for문 들어가기 전 1번만 수행)
-    const shouldDecayTrail = (trailFrameCount % TRAIL_DECAY_INTERVAL === 0);
-  
-    // 2. 단 일 (Single) 2중 for문
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let c = 0; c < GRID_SIZE; c++) {
-        const neighbors = countNeighbors(r, c);
-        const isAlive = grid[r][c] === 1;
-  
-        let nextState = isAlive ? (survivalRules.has(neighbors) ? 1 : 0) : (birthRules.has(neighbors) ? 1 : 0);
-        nextGrid[r][c] = nextState;
-  
-        if (nextState === 1) {
-          currentPop++;
-          historyGrid[r][c] = TRAIL_MAX;
-        } else if (historyGrid[r][c] > 0) {
-          if (shouldDecayTrail) {
-            historyGrid[r][c]--;
+      const nextGrid = createGrid();
+      let bornThisStep = 0;
+      let diedThisStep = 0;
+      let currentPop = 0;
+      
+      const shouldDecayTrail = (trailFrameCount % TRAIL_DECAY_INTERVAL === 0);
+      
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const neighbors = countNeighbors(r, c);
+          const isAlive = grid[r][c] === 1;
+          
+          let nextState = isAlive ? (survivalRules.has(neighbors) ? 1 : 0) : (birthRules.has(neighbors) ? 1 : 0);
+          nextGrid[r][c] = nextState;
+          
+          if (nextState === 1) {
+            currentPop++;
+            historyGrid[r][c] = TRAIL_MAX;
+          } else if (historyGrid[r][c] > 0) {
+            if (shouldDecayTrail) {
+              historyGrid[r][c]--;
+            }
           }
+          
+          if (!isAlive && nextState === 1) bornThisStep++;
+          if (isAlive && nextState === 0) diedThisStep++;
         }
-  
-        if (!isAlive && nextState === 1) bornThisStep++;
-        if (isAlive && nextState === 0) diedThisStep++;
       }
+      
+      trailFrameCount++;
+      
+      grid = nextGrid;
+      stats.population = currentPop;
+      stats.totalBorn += bornThisStep;
+      stats.totalDied += diedThisStep;
+      stats.generation++;
     }
-  
-    // 3. for문이 전부 끝난 후 카운터 증가
-    trailFrameCount++;
-  
-    // 4. 상태 및 통계 업데이트
-    grid = nextGrid;
-    stats.population = currentPop;
-    stats.totalBorn += bornThisStep;
-    stats.totalDied += diedThisStep;
-    stats.generation++;
-  }
 
     function countNeighbors(r, c) {
       let count = 0;
       for (let dr = -1; dr <= 1; dr++) {
         for (let dc = -1; dc <= 1; dc++) {
           if (dr === 0 && dc === 0) continue;
-          const nr = (r + dr + GRID_SIZE) % GRID_SIZE;
-          const nc = (c + dc + GRID_SIZE) % GRID_SIZE;
-          count += grid[nr][nc];
+          
+          if (wrapEdges) {
+            const nr = (r + dr + GRID_SIZE) % GRID_SIZE;
+            const nc = (c + dc + GRID_SIZE) % GRID_SIZE;
+            count += grid[nr][nc];
+          } else {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE) {
+              count += grid[nr][nc];
+            }
+          }
         }
       }
       return count;
@@ -757,10 +789,18 @@
       txtGen.innerText = t.gen;
       txtSpeedLabel.innerText = t.speed;
       txtHistoryTrail.innerText = t.historyTrail;
+      txtWrapEdges.innerText = t.wrapEdges;
 
       btnPlay.innerText = isRunning ? t.pause : t.play;
       btnSpawnPattern.innerText = t.spawn;
       btnClear.innerText = t.clear;
+
+      // Update Pattern Preset Select Labels
+      Array.from(patternSelect.options).forEach(opt => {
+        if (t.patterns[opt.value]) {
+          opt.innerText = t.patterns[opt.value];
+        }
+      });
     }
 
     langSelect.onchange = (e) => {
@@ -796,9 +836,17 @@
         const row = Math.floor(mouseY / CELL_SIZE);
 
         if (row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE) {
-          grid[row][col] = grid[row][col] ? 0 : 1;
-          if (grid[row][col] === 1) historyGrid[row][col] = TRAIL_MAX;
-          stats.population += grid[row][col] ? 1 : -1;
+          const newState = grid[row][col] ? 0 : 1;
+          grid[row][col] = newState;
+          
+          if (newState === 1) {
+            historyGrid[row][col] = TRAIL_MAX;
+          } else {
+            // 실행 중이 아닐 때 수동으로 셀을 삭제한 경우 흔적도 제거
+            historyGrid[row][col] = 0;
+          }
+
+          stats.population += newState ? 1 : -1;
           updateHUD();
           draw();
         }
@@ -853,6 +901,10 @@
       draw();
     };
 
+    chkWrap.onchange = (e) => {
+      wrapEdges = e.target.checked;
+    };
+
     btnClear.onclick = () => {
       if (isRunning) btnPlay.click();
       grid = createGrid();
@@ -876,7 +928,8 @@
     initRuleButtons();
     updateSpeedDisplay();
     resizeCanvas();
-    spawnPattern('gliderGun'); // 기본 프리셋으로 글라이더 캐논 생성
+    changeLanguage('en');
+    spawnPattern('gliderGun');
   </script>
 </body>
 </html>
