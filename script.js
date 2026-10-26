@@ -1,4 +1,5 @@
-// i18n Translations Dictionary
+document.addEventListener("DOMContentLoaded", () => {
+    // i18n Translations Dictionary
     const translations = {
       en: {
         hudTitle: "Simulation Stats",
@@ -569,3 +570,4 @@
     resizeCanvas();
     changeLanguage('en');
     spawnPattern('gliderGun');
+});
