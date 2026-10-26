@@ -1,2 +1,2 @@
-# vercel_gameoflife
+# Simple Game of Life
 Conway's Game of Life
